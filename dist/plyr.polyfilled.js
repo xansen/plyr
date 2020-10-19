@@ -1,7 +1,7 @@
 typeof navigator === "object" && (function (global, factory) {
   typeof exports === 'object' && typeof module !== 'undefined' ? module.exports = factory() :
   typeof define === 'function' && define.amd ? define('Plyr', factory) :
-  (global = global || self, global.Plyr = factory());
+  (global = typeof globalThis !== 'undefined' ? globalThis : global || self, global.Plyr = factory());
 }(this, (function () { 'use strict';
 
   // Polyfill for creating CustomEvents on IE9/10/11
@@ -4408,7 +4408,7 @@ typeof navigator === "object" && (function (global, factory) {
     var checkIfURLSearchParamsSupported = function checkIfURLSearchParamsSupported() {
       try {
         var URLSearchParams = global.URLSearchParams;
-        return new URLSearchParams('?a=1').toString() === 'a=1' && typeof URLSearchParams.prototype.set === 'function';
+        return new URLSearchParams('?a=1').toString() === 'a=1' && typeof URLSearchParams.prototype.set === 'function' && typeof URLSearchParams.prototype.entries === 'function';
       } catch (e) {
         return false;
       }
@@ -4512,6 +4512,7 @@ typeof navigator === "object" && (function (global, factory) {
             baseElement;
 
         if (base && (global.location === void 0 || base !== global.location.href)) {
+          base = base.toLowerCase();
           doc = document.implementation.createHTMLDocument('');
           baseElement = doc.createElement('base');
           baseElement.href = base;
@@ -4532,7 +4533,11 @@ typeof navigator === "object" && (function (global, factory) {
           anchorElement.href = anchorElement.href; // force href to refresh
         }
 
-        if (anchorElement.protocol === ':' || !/:/.test(anchorElement.href)) {
+        var inputElement = doc.createElement('input');
+        inputElement.type = 'url';
+        inputElement.value = url;
+
+        if (anchorElement.protocol === ':' || !/:/.test(anchorElement.href) || !inputElement.checkValidity() && !base) {
           throw new TypeError('Invalid URL');
         }
 
@@ -10093,7 +10098,7 @@ typeof navigator === "object" && (function (global, factory) {
       vimeo: {
         sdk: 'https://player.vimeo.com/api/player.js',
         iframe: 'https://player.vimeo.com/video/{0}?{1}',
-        api: 'https://vimeo.com/api/v2/video/{0}.json'
+        api: 'https://vimeo.com/api/oembed.json?url={0}'
       },
       youtube: {
         sdk: 'https://www.youtube.com/iframe_api',
@@ -12168,17 +12173,13 @@ typeof navigator === "object" && (function (global, factory) {
       } // Get poster image
 
 
-      fetch(format(player.config.urls.vimeo.api, id), 'json').then(function (response) {
-        if (is$1.empty(response)) {
+      fetch(format(player.config.urls.vimeo.api, src)).then(function (response) {
+        if (is$1.empty(response) || !response.thumbnail_url) {
           return;
-        } // Get the URL for thumbnail
+        } // Set and show poster
 
 
-        var url = new URL(response[0].thumbnail_large); // Get original image
-
-        url.pathname = "".concat(url.pathname.split('_')[0], ".jpg"); // Set and show poster
-
-        ui.setPoster.call(player, url.href).catch(function () {});
+        ui.setPoster.call(player, response.thumbnail_url).catch(function () {});
       }); // Setup instance
       // https://github.com/vimeo/player.js
 
@@ -12564,7 +12565,7 @@ typeof navigator === "object" && (function (global, factory) {
       var config = player.config.youtube; // Setup instance
       // https://developers.google.com/youtube/iframe_api_reference
 
-      player.embed = new window.YT.Player(id, {
+      player.embed = new window.YT.Player(player.media, {
         videoId: videoId,
         host: getHost$1(config),
         playerVars: extend({}, {
